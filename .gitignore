@@ -12,3 +12,12 @@ vignettes/**/*_files/
 docs/*.Rmd
 docs/examples
 paper/paper.html
+inst/doc
+
+.lazytest
+
+revdep
+revdep/checks.noindex
+revdep/library.noindex
+
+testlog*.md

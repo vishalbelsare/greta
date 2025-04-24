@@ -1,7 +1,4 @@
 library(testthat)
-library(tensorflow)
 library(greta)
-library(fields)
-library(mockery)
-
+options(testthat.progress.max_fails = 100)
 test_check("greta")

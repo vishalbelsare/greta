@@ -48,27 +48,21 @@
 #' sims <- simulate(m, nsim = 100)
 #' }
 #' # nolint start
-simulate.greta_model <- function(object,
-                                 nsim = 1,
-                                 seed = NULL,
-                                 precision = c("double", "single"),
-                                 ...) {
+simulate.greta_model <- function(
+  object,
+  nsim = 1,
+  seed = NULL,
+  precision = c("double", "single"),
+  ...
+) {
   # nolint end
   # find all the greta arrays in the calling environment
   target_greta_arrays <- all_greta_arrays(parent.frame())
 
   # subset these to only those that are associated with the model
   target_nodes <- lapply(target_greta_arrays, get_node)
-  target_node_names <- vapply(target_nodes,
-    member,
-    "unique_name",
-    FUN.VALUE = character(1)
-  )
-  object_node_names <- vapply(object$dag$node_list,
-    member,
-    "unique_name",
-    FUN.VALUE = character(1)
-  )
+  target_node_names <- extract_unique_names(target_nodes)
+  object_node_names <- extract_unique_names(object$dag$node_list)
   keep <- target_node_names %in% object_node_names
   target_greta_arrays <- target_greta_arrays[keep]
 

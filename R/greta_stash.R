@@ -1,50 +1,33 @@
 greta_note_msg <- cli::format_message(
   c(
     "If you are reading this, the {.pkg greta} installation or error notes \\
-    have been wiped."
-    )
+    have been wiped. This likely means that installation has not happened, or \\
+    it has happened and you've restarted R. See `?install_greta_deps()` for \\
+    more information."
+  )
 )
 
 greta_stash$install_miniconda_notes <- greta_note_msg
+greta_stash$install_miniconda_error <- greta_note_msg
 greta_stash$conda_create_notes <- greta_note_msg
+greta_stash$conda_create_error <- greta_note_msg
 greta_stash$conda_install_notes <- greta_note_msg
+greta_stash$conda_install_error <- greta_note_msg
 greta_stash$tf_num_error <- greta_note_msg
 
-#' @title Retrieve python installation or error details
+#' @title Retrieve python messages.
 #'
-#' These functions retrieve installation or error information output by python
-#'   when running `install_miniconda()`, `conda_create()`, `conda_install()`, or
-#'   when encountering a TensorFlow numerical problem.
+#' @description
+#'  These functions retrieve specific python error messages that might
+#'   come up during greta use.
 #'
 #' @rdname stash-notes
 #' @export
 #' @examples
 #' \dontrun{
-#' greta_notes_install_miniconda()
-#' greta_notes_conda_create()
-#' greta_notes_conda_install()
-#' greta_notes_tf_num_error()
 #' greta_notes_tf_error()
 #' }
-greta_notes_install_miniconda <- function() {
-  cat(greta_stash$install_miniconda_notes)
-}
-
-
-#' @name stash-notes
-#' @export
-greta_notes_conda_create <- function() {
-  cat(greta_stash$conda_create_notes)
-}
-
-#' @name stash-notes
-#' @export
-greta_notes_conda_install <- function() {
-  cat(greta_stash$conda_install_notes)
-}
-
-#' @name stash-notes
-#' @export
 greta_notes_tf_num_error <- function() {
-  cat(greta_stash$tf_num_error)
+  # wrap in paste0 to remove list properties
+  cat(paste0(greta_stash$tf_num_error))
 }

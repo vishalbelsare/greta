@@ -1,6 +1,29 @@
+set.seed(2020 - 02 - 11)
+
+test_that("log.greta_array has a warning when base argument used", {
+  skip_if_not(check_tf_version())
+
+  x <- normal(0, 1)
+  expect_snapshot(
+    log(x)
+  )
+
+  expect_snapshot_warning(
+    log(x, base = 3)
+  )
+
+  y <- as_data(matrix(1:9, nrow = 3, ncol = 3))
+  expect_snapshot(
+    y
+  )
+
+  expect_snapshot_warning(
+    log(exp(x), base = 3)
+  )
+})
+
 test_that("simple functions work as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- randn(25, 4)
   n <- 10
@@ -39,7 +62,7 @@ test_that("simple functions work as expected", {
 
 test_that("primitive functions work as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
+  # source("helpers.R")
 
   real <- randn(25, 4)
   pos <- exp(real)
@@ -56,45 +79,37 @@ test_that("primitive functions work as expected", {
   check_op(atanh, m1p1)
   check_op(cospi, real)
   check_op(sinpi, real)
-  check_op(tanpi, real, tolerance = 1e-2)
-  check_op(trigamma, real, tolerance = 2e-2)
+  # potentially change check_op to use absolute or relative error
+  check_op(tanpi, real, relative_error = TRUE)
+  check_op(trigamma, real, relative_error = TRUE)
 })
 
 test_that("cummax and cummin functions error informatively", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   cumulative_funs <- list(cummax, cummin)
   x <- as_data(randn(10))
 
   for (fun in cumulative_funs) {
-    expect_snapshot(
-      error = TRUE,
-      fun(x)
-    )
+    expect_snapshot(error = TRUE, fun(x))
   }
 })
 
 test_that("complex number functions error informatively", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   complex_funs <- list(Im, Re, Arg, Conj, Mod)
   x <- as_data(randn(25, 4))
 
   for (fun in complex_funs) {
-    expect_snapshot(
-      error = TRUE,
-      fun(x)
-    )
+    expect_snapshot(error = TRUE, fun(x))
   }
 })
 
 test_that("matrix functions work as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
-  a <- rWishart(1, 6, diag(5))[, , 1]
+  a <- rWishart(1, 6, diag(5))[,, 1]
   b <- randn(5, 25)
   c <- chol(a)
   d <- c(1, 1)
@@ -125,9 +140,8 @@ test_that("matrix functions work as expected", {
 
 test_that("kronecker works with greta and base array arguments", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
-  a <- rWishart(1, 6, diag(5))[, , 1]
+  a <- rWishart(1, 6, diag(5))[,, 1]
   b <- chol(a)
 
   a_greta <- as_data(a)
@@ -137,8 +151,8 @@ test_that("kronecker works with greta and base array arguments", {
   greta_out1 <- kronecker(a_greta, b)
   greta_out2 <- kronecker(a, b_greta)
 
-  expect_true(is.greta_array(greta_out1))
-  expect_true(is.greta_array(greta_out1))
+  expect_s3_class(greta_out1, "greta_array")
+  expect_s3_class(greta_out1, "greta_array")
 
   compare_op(base_out, grab(greta_out1))
   compare_op(base_out, grab(greta_out2))
@@ -146,7 +160,6 @@ test_that("kronecker works with greta and base array arguments", {
 
 test_that("aperm works as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   a <- randn(5, 4, 3, 2, 1)
 
@@ -162,7 +175,6 @@ test_that("aperm works as expected", {
 
 test_that("reducing functions work as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   a <- randn(1, 3)
   b <- randn(5, 25)
@@ -194,7 +206,6 @@ test_that("reducing functions work as expected", {
 
 test_that("cumulative functions work as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   a <- randn(5)
 
@@ -204,11 +215,13 @@ test_that("cumulative functions work as expected", {
 
 test_that("apply works as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   # check apply.greta_array works like R's apply for X
-  check_apply <- function(X, MARGIN, FUN) { # nolint
-    check_op(apply, a,
+  check_apply <- function(X, MARGIN, FUN) {
+    # nolint
+    check_op(
+      apply,
+      a,
       other_args = list(
         MARGIN = MARGIN,
         FUN = FUN
@@ -235,7 +248,6 @@ test_that("apply works as expected", {
 
 test_that("tapply works as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- randn(15, 1)
 
@@ -248,37 +260,21 @@ test_that("tapply works as expected", {
 
 test_that("cumulative functions error as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   a <- as_data(randn(1, 5))
   b <- as_data(randn(5, 1, 1))
 
+  expect_snapshot(error = TRUE, cumsum(a))
 
-  expect_snapshot(
-    error = TRUE,
-    cumsum(a)
-    )
+  expect_snapshot(error = TRUE, cumsum(b))
 
-  expect_snapshot(
-    error = TRUE,
-    cumsum(b)
-  )
+  expect_snapshot(error = TRUE, cumprod(a))
 
-  expect_snapshot(
-    error = TRUE,
-    cumprod(a)
-  )
-
-  expect_snapshot(
-    error = TRUE,
-    cumprod(b)
-  )
-
+  expect_snapshot(error = TRUE, cumprod(b))
 })
 
 test_that("sweep works as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   stats_list <- list(randn(5), randn(25))
   x <- randn(5, 25)
@@ -299,7 +295,6 @@ test_that("sweep works as expected", {
 
 test_that("sweep works for numeric x and greta array STATS", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   stats <- randn(5)
   ga_stats <- as_data(stats)
@@ -313,7 +308,6 @@ test_that("sweep works for numeric x and greta array STATS", {
 
 test_that("solve and sweep and kronecker error as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   a <- as_data(randn(5, 25))
   b <- as_data(randn(5, 25, 2))
@@ -376,8 +370,7 @@ test_that("solve and sweep and kronecker error as expected", {
     sweep(a, 1, t(stats))
   )
 
-
-    expect_snapshot(
+  expect_snapshot(
     error = TRUE,
     sweep(a, 2, stats)
   )
@@ -394,94 +387,57 @@ test_that("solve and sweep and kronecker error as expected", {
     error = TRUE,
     kronecker(b, c)
   )
-
 })
 
 test_that("colSums etc. error as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- as_data(randn(3, 4, 5))
 
-  expect_snapshot(
-    error = TRUE,
-    colSums(x, dims = 3)
-  )
+  expect_snapshot(error = TRUE, colSums(x, dims = 3))
 
-  expect_snapshot(
-    error = TRUE,
-    rowSums(x, dims = 3)
-  )
+  expect_snapshot(error = TRUE, rowSums(x, dims = 3))
 
-  expect_snapshot(
-    error = TRUE,
-    colMeans(x, dims = 3)
-  )
+  expect_snapshot(error = TRUE, colMeans(x, dims = 3))
 
-  expect_snapshot(
-    error = TRUE,
-    rowMeans(x, dims = 3)
-  )
-
+  expect_snapshot(error = TRUE, rowMeans(x, dims = 3))
 })
 
 test_that("forwardsolve and backsolve error as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   a <- wishart(6, diag(5))
   b <- as_data(randn(5, 25))
   c <- chol(a)
 
-  expect_snapshot(
-    error = TRUE,
-    forwardsolve(a, b, k = 1)
-  )
+  expect_snapshot(error = TRUE, forwardsolve(a, b, k = 1))
 
-  expect_snapshot(
-    error = TRUE,
-    backsolve(a, b, k = 1)
-  )
+  expect_snapshot(error = TRUE, backsolve(a, b, k = 1))
 
-  expect_snapshot(
-    error = TRUE,
-    forwardsolve(a, b, transpose = TRUE)
-  )
+  expect_snapshot(error = TRUE, forwardsolve(a, b, transpose = TRUE))
 
-  expect_snapshot(
-    error = TRUE,
-    backsolve(a, b, transpose = TRUE)
-  )
-
+  expect_snapshot(error = TRUE, backsolve(a, b, transpose = TRUE))
 })
 
 test_that("tapply errors as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   group <- sample.int(5, 10, replace = TRUE)
   a <- ones(10, 1)
   b <- ones(10, 2)
 
   # X must be a column vector
-  expect_snapshot(
-    error = TRUE,
-    tapply(b, group, "sum")
-  )
+  expect_snapshot(error = TRUE, tapply(b, group, "sum"))
 
   # INDEX can't be a greta array
-  expect_snapshot(
-    error = TRUE,
-    tapply(a, as_data(group), "sum")
-  )
+  expect_snapshot(error = TRUE, tapply(a, as_data(group), "sum"))
 })
 
 test_that("eigen works as expected", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   k <- 4
-  x <- rWishart(1, k + 1, diag(k))[, , 1]
+  x <- rWishart(1, k + 1, diag(k))[,, 1]
   x_ga <- as_data(x)
 
   r_out <- eigen(x)
@@ -489,7 +445,6 @@ test_that("eigen works as expected", {
 
   r_out_vals <- eigen(x, only.values = TRUE)
   greta_out_vals <- eigen(as_data(x), only.values = TRUE)
-
 
   # values
   compare_op(r_out$values, grab(greta_out$values))
@@ -511,7 +466,8 @@ test_that("eigen works as expected", {
   }
 
   greta_vectors <- grab(greta_out$vectors)
-  difference <- vapply(seq_len(k),
+  difference <- vapply(
+    seq_len(k),
     function(i) {
       column_difference(
         r_out$vectors[, i],
@@ -526,27 +482,23 @@ test_that("eigen works as expected", {
 
 test_that("ignored options are errored/warned about", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- ones(3, 3)
-  expect_snapshot(
-    error = TRUE,
-    round(x, 2)
-  )
+  expect_snapshot(error = TRUE, round(x, 2))
 
-  expect_snapshot(
+  expect_snapshot_warning(
     chol(x, pivot = TRUE)
   )
 
-  expect_snapshot(
+  expect_snapshot_warning(
     chol2inv(x, LINPACK = TRUE)
   )
 
-  expect_snapshot(
+  expect_snapshot_warning(
     chol2inv(x, size = 1)
   )
 
-  expect_snapshot(
+  expect_snapshot_warning(
     rdist(x, compact = TRUE)
   )
 })
@@ -554,68 +506,39 @@ test_that("ignored options are errored/warned about", {
 
 test_that("incorrect dimensions are errored about", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- ones(3, 3, 3)
   y <- ones(3, 4)
 
-  expect_snapshot(
-    error = TRUE,
-    t(x)
-  )
+  expect_snapshot(error = TRUE, t(x))
 
-  expect_snapshot(
-    error = TRUE,
-    aperm(x, 2:1)
-  )
+  expect_snapshot(error = TRUE, aperm(x, 2:1))
 
-  expect_snapshot(
-    error = TRUE,
-    chol(x)
-  )
+  expect_snapshot(error = TRUE, chol(x))
 
-  expect_snapshot(
-    error = TRUE,
-    chol(y)
-  )
+  expect_snapshot(error = TRUE, chol(y))
 
-  expect_snapshot(
-    error = TRUE,
-    chol2symm(x)
-  )
+  expect_snapshot(error = TRUE, chol2symm(x))
 
-  expect_snapshot(
-    error = TRUE,
-    chol2symm(y)
-  )
+  expect_snapshot(error = TRUE, chol2symm(y))
 
-  expect_snapshot(
-    error = TRUE,
-    eigen(x)
-  )
+  expect_snapshot(error = TRUE, eigen(x))
 
-  expect_snapshot(
-    error = TRUE,
-    eigen(y)
-  )
+  expect_snapshot(error = TRUE, eigen(y))
 
-  expect_snapshot(
-    error = TRUE,
-    rdist(x, y)
-  )
+  expect_snapshot(error = TRUE, rdist(x, y))
 })
 
 test_that("chol2symm inverts chol", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
-  x <- rWishart(1, 10, diag(9))[, , 1]
+  x <- rWishart(1, 10, diag(9))[,, 1]
   u <- chol(x)
 
   # check the R version
-  expect_equal(x, chol2symm(u))
+  expect_equal(x, chol2symm(u), tolerance = .Machine$double.eps)
 
   # check the greta version
   x2 <- calculate(chol2symm(as_data(u)))[[1]]
-  expect_equal(x2, x)
+  expect_equal(x2, x, tolerance = .Machine$double.eps)
 })

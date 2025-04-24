@@ -33,7 +33,8 @@
 #' # get the distribution over y
 #' distribution(y)
 #' }
-`distribution<-` <- function(greta_array, value) { # nolint
+`distribution<-` <- function(greta_array, value) {
+  # nolint
 
   # stash the old greta array to return
   greta_array_tmp <- greta_array
@@ -43,36 +44,30 @@
 
   node <- get_node(greta_array)
 
+  # TODO revisit checking functions here
   # only for greta arrays without distributions
+  ## TODO provide more detail on the distribution already assigned
+  ## This might come up when the user accidentally runs assignment
+  ## of a distribution twice. Is there a way to avoid this, or perhaps
+  ## remove a distribution in case the user wants to do reassign it?
+  ## or perhaps we can recommend something?
   if (has_distribution(node)) {
-    msg <- cli::format_error(
+    cli::cli_abort(
       "left hand side already has a distribution assigned"
-    )
-    stop(
-      msg,
-      call. = FALSE
     )
   }
 
   # only for data greta arrays
   if (node_type(node) != "data") {
-    msg <- cli::format_error(
+    cli::cli_abort(
       "distributions can only be assigned to data {.cls greta array}s"
-    )
-    stop(
-      msg,
-      call. = FALSE
     )
   }
 
   # can only assign with greta arrays ...
-  if (!inherits(value, "greta_array")) {
-    msg <- cli::format_error(
+  if (!is.greta_array(value)) {
+    cli::cli_abort(
       "right hand side must be a {.cls greta_array}"
-    )
-    stop(
-      msg,
-      call. = FALSE
     )
   }
 
@@ -80,44 +75,33 @@
   value_node <- get_node(value)
   distribution_node <- value_node$distribution
 
-  if (!inherits(distribution_node, "distribution_node")) {
-    msg <- cli::format_error(
+  if (!is.distribution_node(distribution_node)) {
+    cli::cli_abort(
       "right hand side must have a distribution"
-    )
-    stop(
-      msg,
-      call. = FALSE
     )
   }
 
   # that aren't already fixed
-  if (inherits(distribution_node$target, "data_node")) {
-    msg <- cli::format_error(
+  if (is.data_node(distribution_node$target)) {
+    cli::cli_abort(
       "right hand side has already been assigned fixed values"
-    )
-    stop(
-      msg,
-      call. = FALSE
     )
   }
 
   # if distribution isn't scalar, make sure it has the right dimensions
-  if (!is_scalar(value)) {
-    if (!identical(dim(greta_array), dim(value))) {
-      msg <- cli::format_error(
-        c(
-          "left and right hand sides have different dimensions. ",
-          "The distribution must have dimension of either \\
+  not_scalar <- !is_scalar(value)
+  lhs_rhs_different_dim <- !identical(dim(greta_array), dim(value))
+  not_scalar_different_dims <- not_scalar && lhs_rhs_different_dim
+  if (not_scalar_different_dims) {
+    cli::cli_abort(
+      c(
+        "left and right hand sides have different dimensions. ",
+        "The distribution must have dimension of either \\
           {.val {paste(dim(greta_array), collapse = 'x')}} or {.val 1x1},\\
           but instead has dimension \\
           {.val {paste(dim(value), collapse = 'x')}}"
-        )
       )
-      stop(
-        msg,
-        call. = FALSE
-      )
-    }
+    )
   }
 
   # assign the new node as the distribution's target
@@ -139,26 +123,13 @@
 #' @rdname distribution
 #' @export
 distribution <- function(greta_array) {
-
   # only for greta arrays
-  if (!inherits(greta_array, "greta_array")) {
-    msg <- cli::format_error(
-      c(
-        "{.fun distribution} expects object of type {.cls greta_array}",
-        "object was not a {.cls greta_array}, but {.cls {class(greta_array)}}"
-      )
-    )
-    stop(
-      msg,
-      call. = FALSE
-    )
-  }
+  check_is_greta_array(greta_array)
 
   # if greta_array has a distribution, return this greta array
-  if (inherits(get_node(greta_array)$distribution, "distribution_node")) {
+  if (is.distribution_node(get_node(greta_array)$distribution)) {
     distrib <- greta_array
   } else {
-
     # otherwise return NULL
     distrib <- NULL
   }

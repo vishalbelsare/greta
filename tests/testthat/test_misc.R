@@ -5,11 +5,8 @@ test_that("check_tf_version works", {
   true_version <- tf$`__version__`
   tf$`__version__` <- "0.9.0" # nolint
 
-  expect_snapshot(
-    error = TRUE,
-    check_tf_version("error")
-  )
-  expect_snapshot(
+  expect_snapshot(error = TRUE, check_tf_version("error"))
+  expect_snapshot_warning(
     check_tf_version("warn")
   )
   expect_snapshot(
@@ -20,53 +17,24 @@ test_that("check_tf_version works", {
   tf$`__version__` <- true_version # nolint
 })
 
-  # forge a missing installation
-test_that("check_tf_version errors when have_python, _tf, or _tfp is FALSE", {
-    # mockery::stub(check_tf_version, 'reticulate::py_module_available', FALSE)
-    mockery::stub(check_tf_version, 'have_python', FALSE)
-    mockery::stub(check_tf_version, 'have_tf', FALSE)
-    mockery::stub(check_tf_version, 'have_tfp', FALSE)
-
-    expect_snapshot(
-      error = TRUE,
-      check_tf_version("error")
-      )
-
-    expect_snapshot(
-      check_tf_version("warn")
-    )
-
-    expect_snapshot(
-      check_tf_version("message")
-    )
-
-})
-
-test_that("check_tf_version fails when tfp not available", {
-    greta_stash$python_has_been_initialised <- FALSE
-    mockery::stub(check_tf_version, 'have_tfp', FALSE)
-    expect_error(
-      check_tf_version("error")
-    )
-  })
 
 test_that(".onLoad runs", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
+
   expect_ok(greta:::.onLoad())
 })
 
 test_that("tensorflow coercion works", {
   skip_if_not(check_tf_version())
 
-  float <- greta:::tf_as_float(1)
-  integer <- greta:::tf_as_integer(1)
-  logical <- greta:::tf_as_logical(1)
+  float <- tf_as_float(1)
+  integer <- tf_as_integer(1)
+  logical <- tf_as_logical(1)
 
   float_type <- options()$greta_tf_float
-  expect_equal(float$dtype$name, float_type)
-  expect_equal(integer$dtype$name, "int32")
-  expect_equal(logical$dtype$name, "bool")
+  expect_identical(float$dtype$name, float_type)
+  expect_identical(integer$dtype$name, "int32")
+  expect_identical(logical$dtype$name, "bool")
 })
 
 test_that("all_greta_arrays works", {
@@ -77,11 +45,11 @@ test_that("all_greta_arrays works", {
   env$b <- as_data(rnorm(10))
   env$c <- env$a * env$b
 
-  array_list <- greta:::all_greta_arrays(env)
-  array_list_nodata <- greta:::all_greta_arrays(env, include_data = FALSE)
+  array_list <- all_greta_arrays(env)
+  array_list_nodata <- all_greta_arrays(env, include_data = FALSE)
 
-  expect_identical(names(array_list), c("a", "b", "c"))
-  expect_identical(names(array_list_nodata), c("a", "c"))
+  expect_named(array_list, c("a", "b", "c"))
+  expect_named(array_list_nodata, c("a", "c"))
 })
 
 test_that("greta_model objects print", {
@@ -89,109 +57,69 @@ test_that("greta_model objects print", {
 
   m <- model(normal(0, 1))
   message <- capture_output(print(m))
-  expect_equal(message, "greta model")
+  expect_identical(message, "greta model")
 })
 
 test_that("define and mcmc error informatively", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- as_data(randn(10))
 
   # no model with non-probability density greta arrays
-  expect_snapshot(
-    error = TRUE,
-    model(variable())
-  )
+  expect_snapshot(error = TRUE, model(variable()))
 
-  expect_snapshot(
-    error = TRUE,
-    model(x)
-  )
+  expect_snapshot(error = TRUE, model(x))
 
-  expect_snapshot(
-    error = TRUE,
-    model()
-  )
+  expect_snapshot(error = TRUE, model())
 
   # can't define a model for an unfixed discrete variable
-  expect_snapshot(
-    error = TRUE,
-    model(bernoulli(0.5))
-  )
+  expect_snapshot(error = TRUE, model(bernoulli(0.5)))
 
   # no parameters here, so define or dag should error
   distribution(x) <- normal(0, 1)
-  expect_snapshot(
-    error = TRUE,
-    model(x)
-  )
+  expect_snapshot(error = TRUE, model(x))
 
   # a bad number of cores
   a <- normal(0, 1)
   m <- model(a)
   expect_warning(
-    mcmc(m,
-         warmup = 1,
-         n_samples = 1,
-         n_cores = 1000000L
-    ),
+    mcmc(m, warmup = 1, n_samples = 1, n_cores = 1000000L, verbose = FALSE),
     "cores were requested, but only"
   )
 
   # can't draw samples of a data greta array
   z <- normal(x, 1)
   m <- model(x, z)
-  expect_snapshot(
-    error = TRUE,
-    draws <- mcmc(m)
-  )
+  expect_snapshot(error = TRUE, draws <- mcmc(m, verbose = FALSE))
 })
 
 test_that("check_dims errors informatively", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   a <- ones(3, 3)
   b <- ones(1)
   c <- ones(2, 2)
   d <- ones(2, 2, 2)
-  dim1 <- c(3, 3)
+  dim1 <- c(3L, 3L)
 
   # with one scalar, it should always should work
-  expect_equal(
-    greta:::check_dims(a, b),
-    dim(a)
-  )
+  expect_identical(check_dims(a, b), dim(a))
 
   # as long as target_dim matches vector dim
-  expect_equal(
-    greta:::check_dims(a, b, target_dim = dim1),
-    dim(a)
-  )
+  expect_identical(check_dims(a, b, target_dim = dim1), dim(a))
 
   # with both scalar, it should always should work
-  expect_equal(
-    greta:::check_dims(b, b),
-    dim(b)
-  )
+  expect_identical(check_dims(b, b), dim(b))
 
   # with two differently shaped arrays it shouldn't
-  expect_snapshot(
-    error = TRUE,
-    greta:::check_dims(a, c)
-  )
+  expect_snapshot(error = TRUE, check_dims(a, c))
 
   # with two scalars and a target dimension, just return the target dimension
-  expect_equal(
-    greta:::check_dims(b, b, target_dim = dim1),
-    dim1
-  )
+  expect_identical(check_dims(b, b, target_dim = dim1), dim1)
 })
 
 test_that("disjoint graphs are checked", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   # if the target nodes aren't related, they sould be checked separately
 
@@ -201,24 +129,16 @@ test_that("disjoint graphs are checked", {
   # c is unrelated and has no density
   c <- variable()
 
-  expect_snapshot(
-    error = TRUE,
-    m <- model(a, b, c)
-  )
+  expect_snapshot(error = TRUE, m <- model(a, b, c))
 
   # d is unrelated and known
   d <- as_data(randn(3))
   distribution(d) <- normal(0, 1)
-  expect_snapshot(
-    error = TRUE,
-    m <- model(a, b, d)
-  )
-
+  expect_snapshot(error = TRUE, m <- model(a, b, d))
 })
 
 test_that("plotting models doesn't error", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   a <- uniform(0, 1)
 
@@ -229,7 +149,6 @@ test_that("plotting models doesn't error", {
 
 test_that("structures work correctly", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   a <- ones(2, 2)
   b <- zeros(2)
@@ -242,7 +161,6 @@ test_that("structures work correctly", {
 
 test_that("cleanly() handles TF errors nicely", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   inversion_stop <- function() {
     stop("this non-invertible thing is not invertible")
@@ -258,11 +176,7 @@ test_that("cleanly() handles TF errors nicely", {
 
   expect_s3_class(cleanly(inversion_stop()), "error")
   expect_s3_class(cleanly(cholesky_stop()), "error")
-  expect_snapshot(
-    error = TRUE,
-    cleanly(other_stop())
-  )
-
+  expect_snapshot(error = TRUE, cleanly(other_stop()))
 })
 
 test_that("double precision works for all jacobians", {
@@ -288,7 +202,8 @@ test_that("double precision works for all jacobians", {
 })
 
 test_that("module works", {
-  mod <- module(mean,
+  mod <- module(
+    mean,
     functions = module(
       sum,
       exp,
@@ -301,6 +216,6 @@ test_that("module works", {
   expect_true(inherits(mod$functions, "list"))
 
   # all elements named, and reordered
-  expect_identical(names(mod), c("functions", "mean"))
-  expect_identical(names(mod$functions), c("exp", "log", "sum"))
+  expect_named(mod, c("functions", "mean"))
+  expect_named(mod$functions, c("exp", "log", "sum"))
 })

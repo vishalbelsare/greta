@@ -1,6 +1,5 @@
 test_that("print and summary work", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   ga_data <- as_data(matrix(1:9, nrow = 3))
   ga_stochastic <- normal(0, 1)
@@ -54,12 +53,10 @@ test_that("print and summary work", {
   expect_snapshot(
     n
   )
-
 })
 
 test_that("as.matrix works", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   # data
   d <- greta_array(0:1, dim = c(3, 3))
@@ -75,4 +72,49 @@ test_that("as.matrix works", {
   o <- v[1]
   o_mat <- as.matrix(o)
   expect_true(inherits(o_mat, "matrix"))
+})
+
+test_that("print method works for longer greta arrays", {
+  skip_if_not(check_tf_version())
+
+  ga_data_long <- as_data(matrix(1:20, ncol = 1))
+  ga_stochastic_long <- normal(0, 1, dim = 20)
+  ga_operation_long <- ga_data_long * ga_stochastic_long
+
+  expect_snapshot(
+    ga_data_long
+  )
+  expect_snapshot(
+    ga_stochastic_long
+  )
+  expect_snapshot(
+    ga_operation_long
+  )
+  expect_snapshot(
+    print(ga_data_long, n = 19)
+  )
+  expect_snapshot(
+    print(ga_data_long, n = 20)
+  )
+  expect_snapshot(
+    print(ga_data_long, n = 21)
+  )
+  expect_snapshot(
+    print(ga_stochastic_long, n = 19)
+  )
+  expect_snapshot(
+    print(ga_stochastic_long, n = 20)
+  )
+  expect_snapshot(
+    print(ga_stochastic_long, n = 21)
+  )
+  expect_snapshot(
+    print(ga_operation_long, n = 19)
+  )
+  expect_snapshot(
+    print(ga_operation_long, n = 20)
+  )
+  expect_snapshot(
+    print(ga_operation_long, n = 21)
+  )
 })

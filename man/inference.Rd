@@ -7,7 +7,7 @@
 \alias{extra_samples}
 \alias{initials}
 \alias{opt}
-\title{statistical inference on greta models}
+\title{Statistical inference on greta models.}
 \usage{
 mcmc(
   model,
@@ -21,7 +21,8 @@ mcmc(
   pb_update = 50,
   one_by_one = FALSE,
   initial_values = initials(),
-  trace_batch_size = 100
+  trace_batch_size = 100,
+  compute_options = cpu_only()
 )
 
 stashed_samples()
@@ -34,7 +35,8 @@ extra_samples(
   verbose = TRUE,
   pb_update = 50,
   one_by_one = FALSE,
-  trace_batch_size = 100
+  trace_batch_size = 100,
+  compute_options = cpu_only()
 )
 
 initials(...)
@@ -46,7 +48,8 @@ opt(
   tolerance = 1e-06,
   initial_values = initials(),
   adjust = TRUE,
-  hessian = FALSE
+  hessian = FALSE,
+  compute_options = cpu_only()
 )
 }
 \arguments{
@@ -89,6 +92,10 @@ starting point for sampling/optimisation.}
 when tracing the parameters of interest; reduce this to reduce memory
 demands}
 
+\item{compute_options}{Default is to use CPU only with \code{cpu_only()}. Use
+\code{gpu_only()} to use only GPU. In the future we will add more options for
+specifying CPU and GPU use.}
+
 \item{draws}{a greta_mcmc_list object returned by \code{mcmc} or
 \code{stashed_samples}}
 
@@ -120,16 +127,16 @@ create \code{model}.
 
 \code{opt} - a list containing the following named elements:
 \itemize{
-\item{\code{par}} {a named list of the optimal values for the greta arrays
-specified in \code{model}}
-\item{\code{value}} {the (unadjusted) negative log joint density of the
-model at the parameters 'par'}
-\item{\code{iterations}} {the number of iterations taken by the optimiser}
-\item{\code{convergence}} {an integer code, 0 indicates successful
+\item \code{par} a named list of the optimal values for the greta arrays
+specified in \code{model}
+\item \code{value} the (unadjusted) negative log joint density of the
+model at the parameters 'par'
+\item \code{iterations} the number of iterations taken by the optimiser
+\item \code{convergence} an integer code, 0 indicates successful
 completion, 1 indicates the iteration limit \code{max_iterations} had
-been reached}
-\item{\code{hessian}} {(if \code{hessian = TRUE}) a named list of hessian
-matrices/arrays for the parameters (w.r.t. \code{value})}
+been reached
+\item \code{hessian} (if \code{hessian = TRUE}) a named list of hessian
+matrices/arrays for the parameters (w.r.t. \code{value})
 }
 }
 \description{
@@ -213,6 +220,11 @@ multiple model parameters, you can construct your model so that all those
 parameters are in a vector, then split the vector up to define the model.
 The parameter vector can then be passed to model. See example.
 }
+\note{
+to set a seed with MCMC you can use \code{\link[=set.seed]{set.seed()}}, or
+\code{\link[tensorflow:set_random_seed]{tensorflow::set_random_seed()}}. They both given identical results. See
+examples below.
+}
 \examples{
 \dontrun{
 # define a simple Bayesian model
@@ -266,8 +278,8 @@ var(x) # different
 o <- opt(m2, initial_values = initials(variance = 1))
 
 # and you can return a list of the Hessians for each of these parameters
-o <- opt(m2, hessians = TRUE)
-o$hessians
+o <- opt(m2, hessian = TRUE)
+o$hessian
 
 
 # to get a hessian matrix across multiple greta arrays, you must first
@@ -278,7 +290,28 @@ mu <- params[1]
 variance <- params[2]
 distribution(x) <- normal(mu, sqrt(variance))
 m3 <- model(params)
-o <- opt(m3, hessians = TRUE)
-o$hessians
+o <- opt(m3, hessian = TRUE)
+o$hessian
+
+# using set.seed or tensorflow::set_random_seed to set RNG for MCMC
+a <- normal(0, 1)
+y <- normal(a, 1)
+m <- model(y)
+
+set.seed(12345)
+one <- mcmc(m, n_samples = 1, chains = 1)
+set.seed(12345)
+two <- mcmc(m, n_samples = 1, chains = 1)
+# same
+all.equal(as.numeric(one), as.numeric(two))
+tensorflow::set_random_seed(12345)
+one_tf <- mcmc(m, n_samples = 1, chains = 1)
+tensorflow::set_random_seed(12345)
+two_tf <- mcmc(m, n_samples = 1, chains = 1)
+# same
+all.equal(as.numeric(one_tf), as.numeric(two_tf))
+# different
+all.equal(as.numeric(one), as.numeric(one_tf))
+
 }
 }

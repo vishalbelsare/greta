@@ -1,44 +1,24 @@
 test_that("variable() errors informatively", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   # bad types
-  expect_snapshot(
-    error = TRUE,
-    variable(upper = NA)
-  )
+  expect_snapshot(error = TRUE, variable(upper = NA))
 
-  expect_snapshot(
-    error = TRUE,
-    variable(upper = head)
-  )
+  expect_snapshot(error = TRUE, variable(upper = head))
 
-  expect_snapshot(
-    error = TRUE,
-    variable(lower = NA)
-  )
+  expect_snapshot(error = TRUE, variable(lower = NA))
 
-  expect_snapshot(
-    error = TRUE,
-    variable(lower = head)
-  )
+  expect_snapshot(error = TRUE, variable(lower = head))
 
   # good types, bad values
-  expect_snapshot(
-    error = TRUE,
-    variable(lower = 0:2, upper = 1:2)
-  )
+  expect_snapshot(error = TRUE, variable(lower = 0:2, upper = 1:2))
 
   # lower not below upper
-  expect_snapshot(
-    error = TRUE,
-    variable(lower = 1, upper = 1)
-  )
+  expect_snapshot(error = TRUE, variable(lower = 1, upper = 1))
 })
 
 test_that("constrained variable constructors error informatively", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   expect_snapshot(
     error = TRUE,
@@ -72,7 +52,6 @@ test_that("constrained variable constructors error informatively", {
 
 test_that("variable() with universal bounds can be sampled correctly", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- rnorm(3, 0, 10)
   mu <- variable(
@@ -92,7 +71,6 @@ test_that("variable() with universal bounds can be sampled correctly", {
 
 test_that("variable() with vectorised bounds can be sampled correctly", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- rnorm(3, 0, 10)
   lower <- c(-3, -1, 2)
@@ -114,7 +92,6 @@ test_that("variable() with vectorised bounds can be sampled correctly", {
 
 test_that("cholesky_variable() can be sampled correctly", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   n <- 3
   u <- cholesky_variable(3)
@@ -134,7 +111,6 @@ test_that("cholesky_variable() can be sampled correctly", {
 
 test_that("cholesky_variable() correlation can be sampled correctly", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   n <- 3
   u <- cholesky_variable(3, correlation = TRUE)
@@ -153,14 +129,15 @@ test_that("cholesky_variable() correlation can be sampled correctly", {
   variances_one <- abs(variance_samples - 1) < 1e-3
   correlations_above_minus_one <- sweep(correlation_samples, 2, -1, `>=`)
   correlations_below_one <- sweep(correlation_samples, 2, 1, `<=`)
-  expect_true(all(variances_one) &
-    all(correlations_above_minus_one) &
-    all(correlations_below_one))
+  expect_true(
+    all(variances_one) &
+      all(correlations_above_minus_one) &
+      all(correlations_below_one)
+  )
 })
 
 test_that("simplex_variable() can be sampled correctly", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   k <- 3
   n <- 10
@@ -180,7 +157,6 @@ test_that("simplex_variable() can be sampled correctly", {
 
 test_that("ordered_variable() can be sampled correctly", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   k <- 3
   n <- 10

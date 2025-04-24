@@ -24,77 +24,6 @@ module <- function(..., sort = TRUE) {
   dots
 }
 
-# find out whether the usr has conda installed and visible
-#' @importFrom reticulate conda_binary
-have_conda <- function() {
-  conda_bin <- tryCatch(reticulate::conda_binary("auto"),
-    error = function(e) NULL
-  )
-  !is.null(conda_bin)
-}
-
-#' @importFrom reticulate py_available
-have_python <- function() {
-  tryCatch(
-    expr = reticulate::py_available(initialize = TRUE),
-    error = function(e) FALSE
-  )
-}
-
-#' @importFrom reticulate py_module_available
-have_tfp <- function() {
-  is_tfp_available <- reticulate::py_module_available("tensorflow_probability")
-
-  if (is_tfp_available) {
-
-    pkg <- reticulate::import("pkg_resources")
-    tfp_version <- pkg$get_distribution("tensorflow_probability")$version
-    is_tfp_available <- utils::compareVersion("0.7.0", tfp_version) == 0
-
-  }
-
-  return(is_tfp_available)
-
-}
-
-#' @importFrom reticulate py_module_available
-have_tf <- function() {
-
-  is_tf_available <- reticulate::py_module_available("tensorflow")
-
-  if (is_tf_available) {
-
-    tf_version <- tf$`__version__`
-    is_tf_available <- utils::compareVersion("1.14.0", tf_version) == 0
-
-  }
-
-  return(is_tf_available)
-
-}
-
-version_tf <- function(){
-  if (have_tf()) {
-    tf$`__version__`
-  } else {
-    msg <- cli::format_error(
-      "{.pkg tensorflow} not found"
-    )
-    stop(
-      msg,
-      call. = FALSE
-      )
-  }
-}
-
-version_tfp <- function(){
-  if (have_tfp()) {
-    tfp$`__version__`
-  } else {
-    msg <- cli::format_message("{.pkg tensorflow-probability} not found")
-    message(msg)
-  }
-}
 
 # helper for *apply statements on R6 objects
 member <- function(x, method) {
@@ -118,10 +47,10 @@ fl <- function(x) {
   tf$constant(x, dtype = tf_float())
 }
 
-# get the tensor for the batch size in the dag currently defining (since it's
-# not alway possible to pass the dag in)
+# get the tensor for the batch size in the dag recently defined (since it's
+# not always possible to pass the dag in)
 get_batch_size <- function() {
-  options()$greta_batch_size
+  greta_stash$batch_size
 }
 
 # coerce an integer(ish) vector to a list as expected in tensorflow shape
@@ -149,7 +78,12 @@ flatten <- function(x) {
 
 # return an integer to pass on as an RNG seed
 get_seed <- function() {
-  sample.int(1e12, 1)
+  # if n is >= 2^31 then the vector is represented as a double, and causes
+  # a bunch of TF mechanics to break as they require integers
+  sample.int(
+    n = 2^30,
+    size = 1
+  )
 }
 
 # does a pointer exist (as a named object) and is it from the current session
@@ -202,12 +136,12 @@ record <- function(expr, file) {
 
 # convert an assumed numeric to an array with at least 2 dimensions
 as_2d_array <- function(x) {
-
   # coerce data from common formats to an array here
   x <- as.array(x)
 
   # coerce 1D arrays to column vectors
-  if (length(dim(x)) == 1) {
+  one_dimensional <- n_dim(x) == 1
+  if (one_dimensional) {
     dim(x) <- c(dim(x), 1)
   }
 
@@ -223,7 +157,8 @@ add_first_dim <- function(x) {
 # drop the additional dimension at the beginning of an array
 drop_first_dim <- function(x) {
   x <- as.array(x)
-  if (length(dim(x)) > 1) {
+  not_1d <- n_dim(x) > 1
+  if (not_1d) {
     x <- array(x, dim = dim(x)[-1])
   }
   x
@@ -239,7 +174,8 @@ tile_first_dim <- function(x, times) {
 # if x is an R matrix representing a column vector, make it a plain R vector
 drop_column_dim <- function(x) {
   dims <- dim(x)
-  if (length(dims) == 2 && dims[2] == 1L) {
+  is_2_by_1 <- length(dims) == 2 && dims[2] == 1L
+  if (is_2_by_1) {
     x <- as.vector(x)
   }
   x
@@ -250,7 +186,7 @@ drop_column_dim <- function(x) {
 # run time)
 expand_to_batch <- function(x, y) {
   batch_size <- tf$shape(y)[[0]]
-  ndim <- length(dim(x))
+  ndim <- n_dim(x)
   tf$tile(x, c(batch_size, rep(1L, ndim - 1)))
 }
 
@@ -269,9 +205,9 @@ match_batches <- function(values) {
 
   have_batches <- vapply(values_mutable, has_batch, FUN.VALUE = TRUE)
 
-  # if any, but not all, have a batch, dimension, tile the others to match the
-  # batch
-  if (!all(have_batches) & any(have_batches)) {
+  any_but_not_all_have_batch_and_dim <- !all(have_batches) & any(have_batches)
+  if (any_but_not_all_have_batch_and_dim) {
+    # tile the others to match the batch
     target_id <- which(have_batches)[1]
     target <- values_mutable[[target_id]]
 
@@ -305,7 +241,9 @@ split_chains <- function(samples_array) {
 # take a greta array dimension and return the dimension of the hessian to return
 # to the user
 hessian_dims <- function(dim) {
-  if (length(dim) == 2 && dim[2] == 1L) {
+  has_2d <- length(dim) == 2
+  is_2_by_1 <- has_2d && dim[2] == 1L
+  if (is_2_by_1) {
     dim <- dim[1]
   }
   rep(dim, 2)
@@ -426,32 +364,30 @@ palettize <- function(base_colour) {
 
 # colour scheme for plotting
 #' @importFrom grDevices col2rgb
-greta_col <- function(which = c(
-                        "main",
-                        "dark",
-                        "light",
-                        "lighter",
-                        "super_light"
-                      ),
-                      colour = "#996bc7") {
-
+greta_col <- function(
+  which = c(
+    "main",
+    "dark",
+    "light",
+    "lighter",
+    "super_light"
+  ),
+  colour = "#996bc7"
+) {
   # tests if a color encoded as string can be converted to RGB
   tryCatch(
     is.matrix(grDevices::col2rgb(colour)),
     error = function(e) {
-      msg <- cli::format_error(
-          "Invalid colour: {colour}"
+      cli::cli_abort(
+        "Invalid colour: {colour}"
       )
-      stop(
-        msg,
-        call. = FALSE
-        )
     }
   )
 
   which <- match.arg(which)
   pal <- palettize(colour)
-  switch(which,
+  switch(
+    which,
     dark = pal(0.45), # 45%
     main = pal(0.55), # 55%
     light = pal(0.65), # 65%ish
@@ -467,32 +403,29 @@ colour_module <- module(
 
 # look in the environment specified by env, and return a named list of all greta
 # arrays in that environment
-all_greta_arrays <- function(env = parent.frame(),
-                             include_data = TRUE) {
-
+all_greta_arrays <- function(env = parent.frame(), include_data = TRUE) {
   # all objects in that environment as a named list
   all_object_names <- ls(envir = env)
 
   # loop carefully in case there are unfulfilled promises
   all_objects <- list()
   for (name in all_object_names) {
-    all_objects[[name]] <- tryCatch(get(name, envir = env),
+    all_objects[[name]] <- tryCatch(
+      get(name, envir = env),
       error = function(e) NULL
     )
   }
 
   # find the greta arrays
-  is_greta_array <- vapply(all_objects,
-    inherits,
-    "greta_array",
-    FUN.VALUE = FALSE
-  )
+  is_greta_array <- are_greta_array(all_objects)
+
   all_arrays <- all_objects[is_greta_array]
 
   # optionally strip out the data arrays
   if (!include_data) {
-    is_data <- vapply(all_arrays,
-      function(x) inherits(get_node(x), "data_node"),
+    is_data <- vapply(
+      all_arrays,
+      function(x) is.data_node(get_node(x)),
       FUN.VALUE = FALSE
     )
     all_arrays <- all_arrays[!is_data]
@@ -515,30 +448,7 @@ quietly <- function(expr) {
 cleanly <- function(expr) {
   res <- tryCatch(expr, error = function(e) e)
 
-  # if it errored
-  if (inherits(res, "error")) {
-
-    # check for known numerical errors
-    numerical_errors <- vapply(greta_stash$numerical_messages,
-      grepl,
-      res$message,
-      FUN.VALUE = 0
-    ) == 1
-
-    # if it was just a numerical error, quietly return a bad value
-    if (!any(numerical_errors)) {
-      msg <- cli::format_error(
-        c(
-          "{.pkg greta} hit a tensorflow error:",
-          "{res}"
-        )
-      )
-      stop(
-        msg,
-        call. = FALSE
-        )
-    }
-  }
+  check_for_errors(res)
 
   res
 }
@@ -552,14 +462,101 @@ prepare_draws <- function(draws, thin = 1) {
   coda::mcmc(draws_df, thin = thin)
 }
 
-build_sampler <- function(initial_values, sampler, model, seed = get_seed()) {
-  sampler$class$new(initial_values,
+build_sampler <- function(
+  initial_values,
+  sampler,
+  model,
+  seed = get_seed(),
+  compute_options
+) {
+  ## TF1/2 retracing
+  ## This is where a retracing warning happens
+  ## in mcmc
+  sampler$class$new(
+    initial_values,
     model,
     sampler$parameters,
-    seed = seed
+    seed = seed,
+    compute_options = compute_options
   )
 }
 
+build_samplers <- function(
+  sampler,
+  initial_values,
+  chains,
+  model,
+  compute_options
+) {
+  # determine number of separate samplers to spin up, based on future plan
+  max_samplers <- future::nbrOfWorkers()
+
+  # divide chains up between the workers
+  chain_assignment <- sort(
+    rep_len(
+      seq_len(max_samplers),
+      length.out = chains
+    )
+  )
+
+  # divide the initial values between them
+  initial_values_split <- split(initial_values, chain_assignment)
+
+  n_samplers <- length(initial_values_split)
+
+  # create a sampler object for each parallel job, using these (possibly NULL)
+  # initial values
+  samplers <- lapply(
+    initial_values_split,
+    build_sampler,
+    sampler,
+    model,
+    compute_options = compute_options
+  )
+
+  # add chain info for printing
+  for (i in seq_len(n_samplers)) {
+    samplers[[i]]$sampler_number <- i
+    samplers[[i]]$n_samplers <- n_samplers
+  }
+
+  samplers
+}
+
+sampler_parallel_reporting <- function(
+  n_chain,
+  samplers,
+  chains,
+  n_samples,
+  warmup
+) {
+  trace_log_files <- replicate(n_chain, create_log_file())
+  percentage_log_files <- replicate(n_chain, create_log_file(TRUE))
+  progress_bar_log_files <- replicate(n_chain, create_log_file(TRUE))
+
+  pb_width <- bar_width(n_chain)
+
+  for (chain in chains) {
+    # set the log files
+    sampler <- samplers[[chain]]
+    sampler$trace_log_file <- trace_log_files[[chain]]
+    sampler$percentage_file <- percentage_log_files[[chain]]
+    sampler$pb_file <- progress_bar_log_files[[chain]]
+
+    # set the progress bar widths for writing
+    sampler$pb_width <- pb_width
+  }
+
+  greta_stash$trace_log_files <- trace_log_files
+  greta_stash$percentage_log_files <- percentage_log_files
+  greta_stash$progress_bar_log_files <- progress_bar_log_files
+  greta_stash$mcmc_info <- list(
+    n_samples = n_samples,
+    warmup = warmup
+  )
+
+  sampler
+}
 # unlist and flatten a list of arrays to a vector row-wise
 unlist_tf <- function(x) {
   # flatten each element row-wise and concatenate
@@ -600,38 +597,12 @@ flatten_trace <- function(i, trace_list) {
 
 # extract the model information object from mcmc samples returned by
 # stashed_samples, and error nicely if there's something fishy
-get_model_info <- function(draws, name = "value") {
-  if (!inherits(draws, "greta_mcmc_list")) {
-    msg <- cli::format_error(
-      c(
-        "{name} must be an {.cls greta_mcmc_list} object",
-        "created by {.fun greta::mcmc}, {.fun greta::stashed_samples}, or \\
-        {.fun greta::extra_samples}"
-      )
-    )
-    stop(
-      msg,
-      call. = FALSE
-    )
-  }
+get_model_info <- function(draws) {
+  check_if_greta_mcmc_list(draws)
 
   model_info <- attr(draws, "model_info")
-  valid <- !is.null(model_info)
 
-  if (!valid) {
-    msg <- cli::format_error(
-      c(
-        "{name} is an {.cls mcmc.list} object, but is not associated with any\\
-        model information",
-        "perhaps it wasn't created by {.fun greta::mcmc}, \\
-        {.fun greta::stashed_samples}, or {.fun greta::extra_samples}?"
-      )
-    )
-    stop(
-      msg,
-      call. = FALSE
-    )
-  }
+  check_if_model_info(model_info)
 
   model_info
 }
@@ -647,17 +618,27 @@ sampler_utils_module <- module(
   get_model_info
 )
 
+# TF1/2 check remove?
+# Is this still needed with the new `tf_function` from TF2?
+# I cannot actually currently see uses of `as_tf_function ` in the code
+# base currently
 # convert a function on greta arrays into a function on corresponding tensors,
 # given the greta arrays for inputs. When executed, this needs to be wrapped in
 # dag$on_graph() to get the tensors connected up with the rest of the graph
+# NOTE: Could use this as a way of getting the functions we need from greta
+# we could use this as a way of returning a function that TF recognises
+# as a function tensorflow function that returns tensors
 as_tf_function <- function(r_fun, ...) {
-
   # run the operation on isolated greta arrays, so nothing gets attached to the
   # model real greta arrays in dots
+  # creating a fake greta array
   ga_dummies <- lapply(list(...), dummy_greta_array)
+
+  # now run the function on these completely separate ones
   ga_out <- do.call(r_fun, ga_dummies)
   ga_out
 
+  # a function that will act on TF things
   function(...) {
     tensor_inputs <- list(...)
 
@@ -665,7 +646,8 @@ as_tf_function <- function(r_fun, ...) {
     tensor_inputs <- lapply(
       tensor_inputs,
       function(x) {
-        if (identical(dim(x), list())) {
+        empty_dim <- identical(dim(x), list())
+        if (empty_dim) {
           x <- tf$reshape(x, shape(1, 1, 1))
         }
         x
@@ -679,12 +661,18 @@ as_tf_function <- function(r_fun, ...) {
     targets <- c(ga_out, ga_dummies)
     sub_dag <- dag_class$new(targets)
 
+    # TF1/2 check remove
+    # `get_default_graph()` doesn't work with either eager execution or
+    # `tf.function`.
     # use the default graph, so that it can be overwritten when this is called?
     # alternatively fetch from above, or put it in greta_stash?
-    sub_dag$tf_graph <- tf$compat$v1$get_default_graph()
+    # sub_dag$tf_graph <- tf$compat$v1$get_default_graph()
     sub_tfe <- sub_dag$tf_environment
 
     # pass on the batch size, used when defining data
+    #  - how many chains or whatever to use
+    # get the batch size from the input tensors - it should be written to the
+    # stash by the main dag - but only if a main dag is defined. What about in calculate?
     sub_tfe$batch_size <- get_batch_size()
 
     # set the input tensors as the values for the dummy greta arrays in the new
@@ -697,12 +685,15 @@ as_tf_function <- function(r_fun, ...) {
 
     # have output node define_tf in the new environment, with data defined as
     # constants
+    # trying to not get them to use placeholders
+    # (TF can have data as a placeholder or a constant)
+    # (using a constant is expensive, normally)
     greta_stash$data_as_constants <- TRUE
+    # TODO explore changin this to previous state
     on.exit(greta_stash$data_as_constants <- NULL)
 
     tf_out <- list()
     for (i in seq_along(ga_out)) {
-
       # define the output nodes
       node_out <- get_node(ga_out[[i]])
       node_out$define_tf(sub_dag)
@@ -736,28 +727,33 @@ utilities_module <- module(
 )
 
 # remove empty strings
-base_remove_empty_string <- function(string){
+base_remove_empty_string <- function(string) {
   string[string != ""]
 }
 
 
-other_install_fail_msg <- function(error_passed){
+other_install_fail_msg <- function(error_passed) {
   # drop ""
   error_passed <- base_remove_empty_string(error_passed)
   cli::format_error(
     message = c(
       "Stopping as installation of {.pkg greta} dependencies failed",
       "An error occured:",
-      "{.code {error_passed}}",
+      "{.code {cat(error_passed)}}",
       "You can perform the entire installation manually with:",
       "{.code reticulate::install_miniconda()}",
       "Then:",
-      "{.code reticulate::conda_create(envname = 'greta-env', \\
-      python_version = '3.7')}",
+      "{.code reticulate::conda_create(envname = 'greta-env-tf2', \\
+      python_version = '3.8')}",
       "Then:",
-      "{.code reticulate::conda_install(envname = 'greta-env',
-      packages = c('numpy==1.16.4', 'tensorflow-probability==0.7.0',
-      'tensorflow==1.14.0'))}",
+      "{.code reticulate::py_install(
+        packages = c(
+          'numpy',
+          'tensorflow',
+          'tensorflow-probability'
+          ),
+        pip = TRUE
+        )}",
       "Then, restart R, and load {.pkg greta} with: {.code library(greta)}",
       "If this does not work, lodge an issue on github at:",
       "{.url https://github.com/greta-dev/greta/issues/new}"
@@ -765,7 +761,7 @@ other_install_fail_msg <- function(error_passed){
   )
 }
 
-timeout_install_msg <- function(timeout, py_error = NULL){
+timeout_install_msg <- function(timeout = 5, py_error = NULL) {
   msg <- c(
     "Stopping as installation of {.pkg greta} dependencies took longer than \\
         {timeout} minutes",
@@ -776,16 +772,25 @@ timeout_install_msg <- function(timeout, py_error = NULL){
     "Alternatively, you can perform the entire installation with:",
     "{.code reticulate::install_miniconda()}",
     "Then:",
-    "{.code reticulate::conda_create(envname = 'greta-env', \\
-        python_version = '3.7')}",
+    "{.code reticulate::conda_create(envname = 'greta-env-tf2', \\
+        python_version = '3.8')}",
     "Then:",
-    "{.code reticulate::conda_install(envname = 'greta-env',
-        packages = c('numpy==1.16.4', 'tensorflow-probability==0.7.0',
-        'tensorflow==1.14.0'))}",
+    "{.code reticulate::py_install(
+        packages = c(
+          'numpy',
+          'tensorflow',
+          'tensorflow-probability'
+          ),
+        pip = TRUE
+        )}",
     "Then, restart R, and load {.pkg greta} with: {.code library(greta)}"
   )
 
-  if (is.null(py_error)){
+  if (nchar(py_error) == 0) {
+    py_error <- NULL
+  }
+
+  if (is.null(py_error)) {
     cli::format_error(
       message = msg
     )
@@ -793,7 +798,7 @@ timeout_install_msg <- function(timeout, py_error = NULL){
     msg <- c(
       msg,
       "Additionally, the following error appeared:",
-      "{py_error}"
+      "{cat({py_error})}"
     )
     cli::format_error(
       message = msg
@@ -801,6 +806,276 @@ timeout_install_msg <- function(timeout, py_error = NULL){
   }
 }
 
-is_DiagrammeR_installed <- function(){
+is_DiagrammeR_installed <- function() {
   requireNamespace("DiagrammeR", quietly = TRUE)
+}
+
+greta_conda_env_path <- function() {
+  if (!have_greta_conda_env()) {
+    cli::cli_ul("path: no conda env found for {.var greta-env-tf2}")
+  }
+
+  py_cl <- reticulate::conda_list()
+  which_greta_env <- which(py_cl$name == "greta-env-tf2")
+  greta_env_path <- py_cl$python[which_greta_env]
+  greta_env_path
+}
+
+# adapted from https://github.com/rstudio/tensorflow/blob/main/R/utils.R
+is_mac_arm64 <- function() {
+  if (nzchar(Sys.getenv("GRETA_M1_MESSAGE_TESTING"))) {
+    return(TRUE)
+  }
+  si <- Sys.info()
+  is_darwin <- si[["sysname"]] == "Darwin"
+  is_arm64 <- si[["machine"]] == "arm64"
+  is_darwin && is_arm64
+}
+
+read_char <- function(path) {
+  trimws(readChar(path, nchars = file.info(path)$size))
+}
+
+create_temp_file <- function(path) {
+  file_path <- tempfile(path, fileext = ".txt")
+  file.create(file_path)
+  return(file_path)
+}
+
+#' @title Set GPU or CPU usage
+#' @name gpu_cpu
+#' @description These functions set the use of CPU or GPU inside of greta. They
+#'   simply return either "GPU" or "CPU", but in the future may handle more
+#'   complexity. These functions are passed to `compute_options` inside of a few
+#'   functions: [mcmc()], [opt()], and [calculate()].
+#' @export
+gpu_only <- function() {
+  "GPU"
+}
+
+#' @rdname gpu_cpu
+#' @export
+cpu_only <- function() {
+  "CPU"
+}
+
+compute_text <- function(n_cores, compute_options) {
+  ifelse(
+    test = n_cores == 1,
+    yes = "each on 1 core",
+    no = ifelse(
+      test = compute_options == "CPU",
+      yes = glue::glue("on up to {n_cores} {compute_options} cores"),
+      # "on GPU"
+      no = glue::glue("on {compute_options}")
+    )
+  )
+}
+
+connected_to_draws <- function(dag, mcmc_dag) {
+  names(dag$node_list) %in% names(mcmc_dag$node_list)
+}
+
+is_using_gpu <- function(x) {
+  x == "GPU"
+}
+
+is_using_cpu <- function(x) {
+  x == "CPU"
+}
+
+`%||%` <- function(x, y) if (is.null(x)) y else x
+
+message_if_using_gpu <- function(compute_options) {
+  gpu_used <- is_using_gpu(compute_options)
+  greta_gpu_message <- getOption("greta_gpu_message") %||% TRUE
+  gpu_used_and_message <- gpu_used && greta_gpu_message
+  if (gpu_used_and_message) {
+    cli::cli_inform(
+      c(
+        "NOTE: When using GPU, the random number seed may not always be \\
+          respected (results may not be fully reproducible).",
+        "For more information, see details of the {.code compute_options} \\
+          argument in {.code ?calculate}.",
+        "You can turn off this message with:",
+        "{.code options(greta_gpu_message = FALSE)}"
+      )
+    )
+  }
+}
+
+n_dim <- function(x) length(dim(x))
+is_2d <- function(x) n_dim(x) == 2
+
+is.node <- function(x, ...) {
+  inherits(x, "node")
+}
+
+is.data_node <- function(x, ...) {
+  inherits(x, "data_node")
+}
+
+is.distribution_node <- function(x, ...) {
+  inherits(x, "distribution_node")
+}
+
+is.variable_node <- function(x, ...) {
+  inherits(x, "variable_node")
+}
+
+is.greta_model <- function(x, ...) {
+  inherits(x, "greta_model")
+}
+
+is.unknowns <- function(x, ...) {
+  inherits(x, "unknowns")
+}
+
+is.initials <- function(x, ...) {
+  inherits(x, "initials")
+}
+
+node_type_colour <- function(type) {
+  switch_cols <- switch(
+    type,
+    variable = cli::col_red(type),
+    data = cli::col_green(type),
+    operation = cli::col_cyan(type),
+    distribution = cli::col_yellow(type)
+  )
+
+  switch_cols
+}
+
+extract_unique_names <- function(x) {
+  vapply(
+    X = x,
+    FUN = member,
+    "unique_name",
+    FUN.VALUE = character(1)
+  )
+}
+
+are_identical <- function(x, y) {
+  vapply(
+    X = x,
+    FUN = identical,
+    FUN.VALUE = logical(1),
+    y
+  )
+}
+
+#' Vectorised is.null
+#'
+#' @param x list of things that may contain NULL values
+#'
+#' @return logical
+#' @export
+#'
+#' @examples
+#' is.null(list(NULL, NULL, 1))
+#' are_null(list(NULL, NULL, 1))
+#' are_null(list(NULL, NULL, NULL))
+#' are_null(list(1, 2, 3))
+#' is.null(list(1, 2, 3))
+are_null <- function(x) {
+  vapply(
+    x,
+    is.null,
+    FUN.VALUE = logical(1)
+  )
+}
+
+are_greta_array <- function(x) {
+  vapply(
+    x,
+    is.greta_array,
+    FUN.VALUE = logical(1)
+  )
+}
+
+have_distribution <- function(x) {
+  vapply(
+    x,
+    has_distribution,
+    FUN.VALUE = logical(1)
+  )
+}
+
+is_windows <- function() {
+  identical(.Platform$OS.type, "windows")
+}
+
+is_mac <- function() {
+  as.logical(Sys.info()["sysname"] == "Darwin")
+}
+
+is_linux <- function() {
+  identical(tolower(Sys.info()[["sysname"]]), "linux")
+}
+
+os_name <- function() {
+  os <- c(
+    windows = is_windows(),
+    mac = is_mac(),
+    linux = is_linux()
+  )
+  names(which(os))
+}
+
+# semantic version finder
+closest_version <- function(current, available) {
+  available <- sort(available)
+  not_available <- !(current %in% available)
+
+  current_gt_available <- all(current > available)
+  current_lt_available <- all(current < available)
+  current_btn_available <- any(current > available) && any(current < available)
+
+  pick_largest <- not_available && current_gt_available
+  pick_smallest <- not_available && current_lt_available
+
+  if (pick_largest) {
+    closest <- max(available)
+  }
+
+  if (pick_smallest) {
+    closest <- min(available)
+  }
+
+  if (current_btn_available) {
+    version_gt <- current > available
+    closest <- max(available[version_gt])
+  }
+
+  return(closest)
+}
+
+outside_version_range <- function(provided, range) {
+  version_num <- numeric_version(provided)
+  above_range <- all(version_num > range)
+  below_range <- all(version_num < range)
+  outside_range <- above_range || below_range
+  outside_range
+}
+
+pretty_dim <- function(x) {
+  x_dim <- dim(x)
+  print_dim_x <- x_dim %||% x
+
+  prettied_dim <- paste(print_dim_x, collapse = "x")
+  prettied_dim
+}
+
+are_initials <- function(x) {
+  vapply(
+    X = x,
+    FUN = is.initials,
+    FUN.VALUE = logical(1)
+  )
+}
+
+n_warmup <- function(x) {
+  x_info <- attr(x, "model_info")
+  x_info$warmup
 }

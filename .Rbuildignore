@@ -11,7 +11,9 @@
 ^CODE_OF_CONDUCT\.md$
 ^\.EDIT_WEBSITE\.md$
 ^LICENSE\.md$
+LICENSE
 ^cran-comments\.md$
+^revdep$
 
 ^logos$
 ^paper$
@@ -40,3 +42,15 @@
 ^codecov\.yml$
 
 ^depends\.rds$
+^CRAN-SUBMISSION$
+^touchstone$
+^.lazytest$
+^\.lazytext$
+^revdep$
+^__autograph*
+^testlog
+^data-raw$
+
+
+# flint files
+^flint$

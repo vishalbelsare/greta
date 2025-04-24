@@ -2,8 +2,9 @@
 
     Code
       variable(upper = NA)
-    Error <simpleError>
-      lower and upper must be numeric
+    Condition
+      Error in `initialize()`:
+      ! lower and upper must be numeric
       lower has class: numeric
       lower has length: 1
       upper has class: logical
@@ -13,8 +14,9 @@
 
     Code
       variable(upper = head)
-    Error <simpleError>
-      lower and upper must be numeric
+    Condition
+      Error in `initialize()`:
+      ! lower and upper must be numeric
       lower has class: numeric
       lower has length: 1
       upper has class: function
@@ -24,8 +26,9 @@
 
     Code
       variable(lower = NA)
-    Error <simpleError>
-      lower and upper must be numeric
+    Condition
+      Error in `initialize()`:
+      ! lower and upper must be numeric
       lower has class: logical
       lower has length: 1
       upper has class: numeric
@@ -35,8 +38,9 @@
 
     Code
       variable(lower = head)
-    Error <simpleError>
-      lower and upper must be numeric
+    Condition
+      Error in `initialize()`:
+      ! lower and upper must be numeric
       lower has class: function
       lower has length: 1
       upper has class: numeric
@@ -46,15 +50,17 @@
 
     Code
       variable(lower = 0:2, upper = 1:2)
-    Error <simpleError>
-      incompatible dimensions: 3x1, 2x1
+    Condition
+      Error in `initialize()`:
+      ! incompatible dimensions: 3x1, 2x1
 
 ---
 
     Code
       variable(lower = 1, upper = 1)
-    Error <simpleError>
-      upper bounds must be greater than lower bounds
+    Condition
+      Error in `initialize()`:
+      ! upper bounds must be greater than lower bounds
       lower is: 1
       upper is: 1
 
@@ -62,43 +68,54 @@
 
     Code
       cholesky_variable(dim = 2:3)
-    Error <simpleError>
-      cholesky variables must be square
-      However its dimension is: "2x3"
+    Condition
+      Error in `cholesky_variable()`:
+      ! Object must be 2D square array
+      x But it had dimension: "2x3"
 
 ---
 
     Code
       cholesky_variable(dim = rep(2, 3))
-    Error <simpleError>
-      `dim` can either be a scalar or a vector of length 2
-      However `dim` has length 3, and contains: "2, 2, 2"
+    Condition
+      Error in `cholesky_variable()`:
+      ! `dim` can either be a scalar or a vector of length 2
+      However `dim` has length 3, and contains:
+      2, 2, and 2
 
 ---
 
     Code
       simplex_variable(1)
-    Error <simpleError>
-      the final dimension of a simplex variable must have more than one element
+    Condition
+      Error in `simplex_variable()`:
+      ! The final dimension of a simplex variable must have more than one element
+      The final dimension has: "1 element"
 
 ---
 
     Code
       simplex_variable(c(3, 1))
-    Error <simpleError>
-      the final dimension of a simplex variable must have more than one element
+    Condition
+      Error in `simplex_variable()`:
+      ! The final dimension of a simplex variable must have more than one element
+      The final dimension has: "1 element"
 
 ---
 
     Code
       ordered_variable(1)
-    Error <simpleError>
-      the final dimension of an ordered variable must have more than one element
+    Condition
+      Error in `ordered_variable()`:
+      ! The final dimension of a ordered variable must have more than one element
+      The final dimension has: "1 element"
 
 ---
 
     Code
       ordered_variable(c(3, 1))
-    Error <simpleError>
-      the final dimension of an ordered variable must have more than one element
+    Condition
+      Error in `ordered_variable()`:
+      ! The final dimension of a ordered variable must have more than one element
+      The final dimension has: "1 element"
 

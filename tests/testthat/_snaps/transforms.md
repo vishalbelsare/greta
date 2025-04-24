@@ -2,7 +2,8 @@
 
     Code
       imultilogit(x)
-    Error <simpleError>
-      `imultilogit()` must have a 2D greta array
-      `dim(x)` returns: 3, 4, and 3
+    Condition
+      Error in `imultilogit()`:
+      ! `x must be two dimensional`
+      However, `x` has dimensions: 3x4x3
 

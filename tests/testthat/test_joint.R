@@ -1,6 +1,5 @@
 test_that("continuous joint variables can be sampled from", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- joint(
     normal(0, 1),
@@ -13,7 +12,6 @@ test_that("continuous joint variables can be sampled from", {
 
 test_that("truncated continuous joint variables can be sampled from", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- joint(
     normal(0, 1, truncation = c(0, Inf)),
@@ -26,7 +24,6 @@ test_that("truncated continuous joint variables can be sampled from", {
 
 test_that("uniform joint variables can be sampled from", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- joint(
     uniform(0, 1),
@@ -39,7 +36,6 @@ test_that("uniform joint variables can be sampled from", {
 
 test_that("joint normals with different truncation types can be sampled", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   x <- joint(
     normal(0, 1, truncation = c(0, Inf)),
@@ -52,11 +48,11 @@ test_that("joint normals with different truncation types can be sampled", {
 
 test_that("fixed continuous joint distributions can be sampled from", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   obs <- matrix(rnorm(3, 0, 2), 100, 3)
   mu <- variable(dim = 3)
-  distribution(obs) <- joint(normal(mu[1], 1),
+  distribution(obs) <- joint(
+    normal(mu[1], 1),
     normal(mu[2], 2),
     normal(mu[3], 3),
     dim = 100
@@ -67,11 +63,11 @@ test_that("fixed continuous joint distributions can be sampled from", {
 
 test_that("fixed discrete joint distributions can be sampled from", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   obs <- matrix(rbinom(300, 1, 0.5), 100, 3)
   probs <- variable(0, 1, dim = 3)
-  distribution(obs) <- joint(bernoulli(probs[1]),
+  distribution(obs) <- joint(
+    bernoulli(probs[1]),
     bernoulli(probs[2]),
     bernoulli(probs[3]),
     dim = 100
@@ -82,7 +78,6 @@ test_that("fixed discrete joint distributions can be sampled from", {
 
 test_that("joint of fixed and continuous distributions errors", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   expect_snapshot(
     error = TRUE,
@@ -95,22 +90,14 @@ test_that("joint of fixed and continuous distributions errors", {
 
 test_that("joint with insufficient distributions errors", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
-  expect_snapshot(
-    error = TRUE,
-    joint(normal(0, 2))
-  )
+  expect_snapshot(error = TRUE, joint(normal(0, 2)))
 
-  expect_snapshot(
-    error = TRUE,
-    joint()
-  )
+  expect_snapshot(error = TRUE, joint())
 })
 
 test_that("joint with non-scalar distributions errors", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   expect_snapshot(
     error = TRUE,
@@ -123,10 +110,10 @@ test_that("joint with non-scalar distributions errors", {
 
 test_that("joint of normals has correct density", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   joint_greta <- function(means, sds, dim) {
-    joint(normal(means[1], sds[1]),
+    joint(
+      normal(means[1], sds[1]),
       normal(means[2], sds[2]),
       normal(means[3], sds[3]),
       dim = dim
@@ -134,10 +121,7 @@ test_that("joint of normals has correct density", {
   }
 
   joint_r <- function(x, means, sds) {
-    densities <- matrix(NA,
-      nrow = length(x),
-      ncol = length(means)
-    )
+    densities <- matrix(NA, nrow = length(x), ncol = length(means))
     for (i in seq_along(means)) {
       densities[, i] <- dnorm(x[, i], means[i], sds[i], log = TRUE)
     }
@@ -150,7 +134,8 @@ test_that("joint of normals has correct density", {
     sds = c(3, 0.5, 1)
   )
 
-  compare_distribution(joint_greta,
+  compare_distribution(
+    joint_greta,
     joint_r,
     parameters = params,
     x = matrix(rnorm(300, -2, 3), 100, 3)
@@ -159,10 +144,10 @@ test_that("joint of normals has correct density", {
 
 test_that("joint of truncated normals has correct density", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   joint_greta <- function(means, sds, lower, upper, dim) {
-    joint(normal(means[1], sds[1], truncation = c(lower[1], upper[1])),
+    joint(
+      normal(means[1], sds[1], truncation = c(lower[1], upper[1])),
       normal(means[2], sds[2], truncation = c(lower[2], upper[2])),
       normal(means[3], sds[3], truncation = c(lower[3], upper[3])),
       dim = dim
@@ -170,12 +155,10 @@ test_that("joint of truncated normals has correct density", {
   }
 
   joint_r <- function(x, means, sds, lower, upper) {
-    densities <- matrix(NA,
-      nrow = length(x),
-      ncol = length(means)
-    )
+    densities <- matrix(NA, nrow = length(x), ncol = length(means))
     for (i in seq_along(means)) {
-      densities[, i] <- truncdist::dtrunc(x[, i],
+      densities[, i] <- truncdist::dtrunc(
+        x[, i],
         "norm",
         a = lower[i],
         b = upper[i],
@@ -200,19 +183,15 @@ test_that("joint of truncated normals has correct density", {
   }
   x <- mapply(fun, params$means, params$sds, params$lower, params$upper)
 
-  compare_distribution(joint_greta,
-    joint_r,
-    parameters = params,
-    x = x
-  )
+  compare_distribution(joint_greta, joint_r, parameters = params, x = x)
 })
 
 test_that("joint of uniforms has correct density", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   joint_greta <- function(lower, upper, dim) {
-    joint(uniform(lower[1], upper[1]),
+    joint(
+      uniform(lower[1], upper[1]),
       uniform(lower[2], upper[2]),
       uniform(lower[3], upper[3]),
       dim = dim
@@ -220,10 +199,7 @@ test_that("joint of uniforms has correct density", {
   }
 
   joint_r <- function(x, lower, upper) {
-    densities <- matrix(NA,
-      nrow = length(x),
-      ncol = length(lower)
-    )
+    densities <- matrix(NA, nrow = length(x), ncol = length(lower))
     for (i in seq_along(lower)) {
       densities[, i] <- dunif(x[, i], lower[i], upper[i], log = TRUE)
     }
@@ -241,30 +217,18 @@ test_that("joint of uniforms has correct density", {
   }
   x <- mapply(fun, params$lower, params$upper)
 
-  compare_distribution(joint_greta,
-    joint_r,
-    parameters = params,
-    x = x
-  )
+  compare_distribution(joint_greta, joint_r, parameters = params, x = x)
 })
 
 test_that("joint of Poissons has correct density", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   joint_greta <- function(rates, dim) {
-    joint(poisson(rates[1]),
-      poisson(rates[2]),
-      poisson(rates[3]),
-      dim = dim
-    )
+    joint(poisson(rates[1]), poisson(rates[2]), poisson(rates[3]), dim = dim)
   }
 
   joint_r <- function(x, rates) {
-    densities <- matrix(NA,
-      nrow = length(x),
-      ncol = length(rates)
-    )
+    densities <- matrix(NA, nrow = length(x), ncol = length(rates))
     for (i in seq_along(rates)) {
       densities[, i] <- dpois(x[, i], rates[i], log = TRUE)
     }
@@ -273,7 +237,8 @@ test_that("joint of Poissons has correct density", {
 
   params <- list(rates = c(0.1, 2, 5))
 
-  compare_distribution(joint_greta,
+  compare_distribution(
+    joint_greta,
     joint_r,
     parameters = params,
     x = matrix(rpois(300, 3), 100, 3)

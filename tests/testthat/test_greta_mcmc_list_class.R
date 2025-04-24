@@ -1,6 +1,7 @@
+set.seed(2020 - 02 - 11)
+
 test_that("draws and raw draws should have the right iteration numbering", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   samples <- 1000
   warmup <- 100
@@ -8,28 +9,27 @@ test_that("draws and raw draws should have the right iteration numbering", {
   m <- model(z)
   draws <- mcmc(m, warmup = warmup, n_samples = samples, verbose = FALSE)
 
-  expect_equal(start(draws), 1)
-  expect_equal(end(draws), samples)
+  expect_identical(start(draws), 1)
+  expect_identical(end(draws), samples)
 
   raw_draws <- get_model_info(draws)$raw_draws
-  expect_equal(start(raw_draws), 1)
-  expect_equal(end(raw_draws), samples)
+  expect_identical(start(raw_draws), 1)
+  expect_identical(end(raw_draws), samples)
 
   # same after calculating
   y <- z^2
 
   y_draws <- calculate(y, values = draws)
-  expect_equal(start(y_draws), 1)
-  expect_equal(end(y_draws), samples)
+  expect_identical(start(y_draws), 1)
+  expect_identical(end(y_draws), samples)
 
   raw_draws <- get_model_info(y_draws)$raw_draws
-  expect_equal(start(raw_draws), 1)
-  expect_equal(end(raw_draws), samples)
+  expect_identical(start(raw_draws), 1)
+  expect_identical(end(raw_draws), samples)
 })
 
 test_that("window works", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   z <- normal(0, 1)
   m <- model(z)
@@ -66,14 +66,14 @@ test_that("window works", {
 
 test_that("windowing does not have spooky effects", {
   skip_if_not(check_tf_version())
-  source("helpers.R")
 
   chains <- 4
   samples <- 100
-  n_samples <- chains * samples
+  n_samples <- as.integer(chains * samples)
   x <- normal(0, 1)
   m <- model(x)
-  draws <- mcmc(m,
+  draws <- mcmc(
+    m,
     warmup = 100,
     n_samples = samples,
     chains = chains,
@@ -82,18 +82,72 @@ test_that("windowing does not have spooky effects", {
 
   raw_draws <- get_model_info(draws)$raw_draws
 
-  expect_equal(dim(as.matrix(draws)), c(n_samples, 1))
-  expect_equal(dim(as.matrix(raw_draws)), c(n_samples, 1))
+  expect_identical(dim(as.matrix(draws)), c(n_samples, 1L))
+  expect_identical(dim(as.matrix(raw_draws)), c(n_samples, 1L))
 
   # drop the first half of the chain in this other object
   draws_2 <- window(draws, start = end(draws) / 2 + 1)
   raw_draws_2 <- get_model_info(draws_2)$raw_draws
-  half_samples <- n_samples / 2
-  expect_equal(dim(as.matrix(draws_2)), c(half_samples, 1))
-  expect_equal(dim(as.matrix(raw_draws_2)), c(half_samples, 1))
+  half_samples <- as.integer(n_samples / 2)
+  expect_identical(dim(as.matrix(draws_2)), c(half_samples, 1L))
+  expect_identical(dim(as.matrix(raw_draws_2)), c(half_samples, 1L))
 
   # the first object should not have changed
   raw_draws <- get_model_info(draws)$raw_draws
-  expect_equal(dim(as.matrix(draws)), c(n_samples, 1))
-  expect_equal(dim(as.matrix(raw_draws)), c(n_samples, 1))
+  expect_identical(dim(as.matrix(draws)), c(n_samples, 1L))
+  expect_identical(dim(as.matrix(raw_draws)), c(n_samples, 1L))
+})
+
+test_that("greta_mcmc_list print method works", {
+  skip_if_not(check_tf_version())
+  samples <- 10
+  warmup <- 10
+  z <- normal(0, 1)
+  m <- model(z)
+  tensorflow::set_random_seed(2024 - 07 - 29 - 1217)
+  draws <- mcmc(m, warmup = warmup, n_samples = samples, verbose = FALSE)
+  expect_snapshot(
+    draws
+  )
+})
+
+test_that("greta_mcmc_list print method works with larger sample size", {
+  skip_if_not(check_tf_version())
+  samples <- 20
+  warmup <- 20
+  z <- normal(0, 1)
+  m <- model(z)
+  tensorflow::set_random_seed(2024 - 07 - 30 - 1233)
+  draws <- mcmc(m, warmup = warmup, n_samples = samples, verbose = FALSE)
+  expect_snapshot(
+    draws
+  )
+  expect_snapshot(
+    print(draws, n = 20)
+  )
+  expect_snapshot(
+    print(draws, n = 19)
+  )
+  expect_snapshot(
+    print(draws, n = 21)
+  )
+})
+
+test_that("greta_mcmc_list print method works with smaller sample size", {
+  skip_if_not(check_tf_version())
+  samples <- 2
+  warmup <- 2
+  z <- normal(0, 1)
+  m <- model(z)
+  tensorflow::set_random_seed(2024 - 07 - 30 - 34)
+  draws <- mcmc(m, warmup = warmup, n_samples = samples, verbose = FALSE)
+  expect_snapshot(
+    draws
+  )
+  expect_snapshot(
+    print(draws, n = 1)
+  )
+  expect_snapshot(
+    print(draws, n = 3)
+  )
 })
